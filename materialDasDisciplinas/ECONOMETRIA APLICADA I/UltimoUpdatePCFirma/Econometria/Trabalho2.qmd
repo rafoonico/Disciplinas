@@ -1,0 +1,394 @@
+---
+title: "Trabalho 2 - Econometria Aplicada"
+author: "William Viana Borges e Rafael Buttini Salviato"
+format: docx
+editor: visual
+---
+
+# ANALISE EXPLORATORIA
+
+```{r, echo=FALSE, warning=FALSE ,message=FALSE}
+library(readxl)
+Base_2023 <- read_excel("Base_2023.xlsx")
+Base_2023$anotrim <- Base_2023$year*10+Base_2023$quarter
+Base_2023$data <- as.Date(paste(Base_2023$year, Base_2023$quarter*3-2, "01", sep = "-"))
+
+library(dplyr)
+
+Base_2023=Base_2023|>transmute(
+  "nome_companhia"=name_short,
+  "data"=data,
+  "setoreconomatica"=setoreconomtica,
+  "alavancagem"=	longtermdebt/patrimniolquido,
+  "tamanhoEmpresa"=	totalasset,
+  "nivel_de_gov"=corporategovernancelevel,
+  "imobilizado"	=permanentasset/totalasset,
+  "retornoSobreAtivo"=	ebit/totalasset,
+  "qDeTobin"=	(shorttermdebt+longtermdebt+shares_outstanding)/totalasset,
+  "ROA"=netprofit/totalasset,
+  "ano"=year,
+  "trim"=quarter
+)|>na.omit()
+Base_2023 <- Base_2023[Base_2023$nome_companhia!="0", ]
+
+row.names(Base_2023)<-NULL
+```
+
+O presente trabalho teve como objetivo examinar a relação entre o Nível de Governança Corporativa e o endividamento das empresas (ou seja, alavancagem). O conjunto de dados com variáveis de Nível de Governança Corporativa e Variáveis Financeiras para um painel de dados de empresas de 1990-2014, foi extraído da ECONOMATICA e disponibilizado pelo professor.
+
+Foi feita uma limpeza na base, onde observações sem variáveis (i.e.: NA's) foram omitidas, e variáveis com os indicadores foram elaboradas. As informações estão por trimestre e, após a limpeza, o conjunto de dados ficou com observações do primeiro trimestre de 2000 até o primeiro trimestre de 2014. Alguns indicadores financeiros (bem como a própria alavancagem) foram calculados a partir dos dados de outras colunas, e seu nomes e fórumlas constam na Tabela 1:
+
+| Nome da variável  | Fórmula com base nas colunas dos dados                     |
+|------------------|------------------------------------------------------|
+| alavancagem       | longtermdebt/patrimniolquido                               |
+| imobilizado       | permanentasset/totalasset                                  |
+| tamanhoEmpresa    | totalasset                                                 |
+| retornoSobreAtivo | ebit/totalasset                                            |
+| qDeTobin          | (shorttermdebt+longtermdebt+shares_outstanding)/totalasset |
+| ROA               | netprofit/totalasset                                       |
+
+Começando a análise exploratória, a Imagem 1 mostra um compilado de gráficos que resume o comportamento da variável resposta ao longo do tempo, bem como o número de observações (i.e.: empresas) que se têm ao longo do tempo. De forma visual, é possível constar que a tanto a média quanto a variância da alavancagem não são constantes ao longo do tempo. O número de empresas por período aumentou considerávelmente no decorrer do tempo, e temos empresas que apresentam valores muito discrepantes e/ou distoantes em relação as demais empresas.
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+
+par(mfrow=c(2,2))
+
+interaction.plot(Base_2023$data,Base_2023$nome_companhia,Base_2023$alavancagem,xlab="Ano/Trimestre",main="Alavancagem por empresa",legend=F,ylab="")
+
+plot(Base_2023$data|>unique()|>sort(),
+     Base_2023$data|>unique()|>sort()|>sapply(function(x){return({Base_2023[Base_2023$data==x,"alavancagem"]|>as.data.frame()}[[1]]|>mean(na.rm=TRUE))}),
+     xlab="Ano/Trimestre",main="Média de alavancagem",legend=F,type="l",ylab="")
+
+plot(Base_2023$data|>unique()|>sort(),
+     Base_2023$data|>unique()|>sort()|>sapply(function(x){return({Base_2023[Base_2023$data==x,"alavancagem"]|>as.data.frame()}[[1]]|>var(na.rm=TRUE)|>sqrt())}),
+     xlab="Ano/Trimestre",main="DesvPad de alavancagem",legend=F,type="l",ylab="")
+
+barplot(table(Base_2023$nome_companhia,Base_2023$data)|>apply(2,sum),
+     xlab="Ano/Trimestre",main="Qtde de empresas observadas",legend=F,type="l",ylab="")
+```
+
+Os diagramas de caixa com os valores de alavancagem por nível de governança ficaram difíceis de se interpretar. Por isso, o Gráfico 1 mostra a média de alavancagem por nível de governança. Verifica-se que o nível de governança "N2" apresentou a maior média de alavancagem, enquanto que o nível de governança "N1" apresentou a menor média de alavancagem.
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+par(mfrow=c(1,1))
+
+barplot(Base_2023$nivel_de_gov|>unique()|>sort()|>sapply(function(x){return({Base_2023[Base_2023$nivel_de_gov==x,"alavancagem"]|>as.data.frame()}[[1]]|>mean(na.rm=TRUE))}),
+     xlab="Nível de governança",main="Média de alavancagem",legend=F,ylab="")
+```
+
+O Gráfico 2 mostra o desvio padrão de alavancagem por nível de governança. Verifica-se que o nível de governança "REG" apresentou o maior desvio padrão de alavancagem, enquanto que o nível de governança "BOV+" apresentou o menor desvio padrão de alavancagem.
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+barplot(Base_2023$nivel_de_gov|>unique()|>sort()|>sapply(function(x){return({Base_2023[Base_2023$nivel_de_gov==x,"alavancagem"]|>as.data.frame()}[[1]]|>var(na.rm=TRUE)|>sqrt())}),
+     xlab="Nível de governança",main="DesvPad de alavancagem",legend=F,ylab="")
+```
+
+E no Gráfico 3, temos o correlograma das variáveis quantitativas. Percebe-se pouca relação das variáveis com a variável resposta, e uma alta correlação entre "ROA" e "retorno sobre o ativo". Dado que a correlação com a variável resposta é maior para a variável "retorno sobre o ativo", a variável "ROA" foi removida do modelo. A variável "tamanho da empresa" foi logaritmizada para melhor ajuste com a variável resposta.
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+
+
+Base_2023$log_tamanhoEmpresa <- log(Base_2023$tamanhoEmpresa)
+Base_2023_2=Base_2023[,-c(1,2,3,6,8,9)]
+names(Base_2023_2)=c("alavanc",
+                     "tamanhoEmp",
+                     "imobilizado",
+                     "RetSobAtiv",
+                     "qDeTobin",
+                     "ROA",
+                     "logTamanEmp")
+
+GGally::ggpairs(Base_2023_2,
+                title="Correlograma das variáveis quantitativas",
+                progress = FALSE)
+
+
+```
+
+E por fim, no Gráfico 4 temos a série da média de alavancagem ao longo do tempo e o momento de sua quebra estrutural, representada pela linha vertical vermelha. Em poucas palavras, podemos dizer que a quebra estrutural sinaliza o momento de uma mudança abrupta no comportamento da série temporal. Na amostra, essa mudança ocorreu no terceiro trimestre de 2004.
+
+```{r, echo=FALSE, warning=FALSE,message=FALSE}
+library(strucchange)
+ts_data <- ts(Base_2023$data|>unique()|>sort()|>sapply(function(x){return({Base_2023[Base_2023$data==x,
+                                                                                     "alavancagem"]|>as.data.frame()}[[1]]|>mean(na.rm=TRUE))}), 
+              start=c(2000, 1),
+              frequency=4)
+
+bp <- breakpoints(ts_data~1)
+
+datas_das_quebras <- {Base_2023$data|>unique()|>sort()}[bp$breakpoints]
+plot(Base_2023$data|>unique()|>sort(),
+     Base_2023$data|>unique()|>sort()|>sapply(function(x){return({Base_2023[Base_2023$data==x,
+                                                                            "alavancagem"]|>as.data.frame()}[[1]]|>mean(na.rm=TRUE))}), 
+     type="l", xlab="Ano/Trimestre",main="Média de alavancagem \n com ponto de quebra estrutural",ylab="")
+sapply(datas_das_quebras,
+       function(x){
+         abline(v=x,col="red")
+       })
+```
+
+Com isso conclui-se a análise exploratória do trabalho. E dado o que foi observado, é razoável supor que as variáveis utilizadas não serão suficientes para modelar a alavancagem, e/ou os modelos irão apresentar problemas com heteroscedasticidade. Nas próximas etapas, estão expostos os resultados dos ajustes dos modelos solicitados. O único pressuposto verificado nos modelos foi a normalidade dos resíduos por uma questão de praticidade. O código com a análise está disponibilizado logo após as Considerações Finais, no Apêndice do trabalho.
+
+# DADOS EM CROSS SECTION
+
+Foram realizados vários ajustes para dados *cross section*. O primeiro ajuste (CS1) contempla todas as observações em todos os períodos, o segundo (CS2) e o terceiro (CS3) ajuste contemplam apenas as observações do primerio e do último período (respectivamente), e o quarto (CS4) e o quinto ajuste (CS5) comtemplam as observações dos períodos que antecedem e sucedem a quebra estrutural na média de alavancagem ilustrada no Gráfico 4, respectivamente. O modelo testado em todos os ajustes é da forma que segue:
+
+$$alavancagem = \beta_0  + \beta_1log(TE) + \beta_2Imob + \beta_3RSA + \beta_4Q_{Tobin} + \psi(NG) + \phi(SE) +\mu,$$ Onde "TE" é o tamanho da empresa, "Imob" é o imobilizado, "RSA" é o retorno sobre o ativo, "QTobin" é o Q de Tobin e o $\psi(NG)$ e $\phi(SE)$ representam as *dummies* dos níveis de governança (NG) e setor do economática (SE), respectivamente. E por fim, $\mu$ é o termo que representa o erro/resíduo do modelo. A Tabela 2 a seguir, resume a performance dos ajustes de forma geral:
+
+| Ajuste | $R^2$   | $R^2_{adjs}$ | $\beta$'s com p-valor\<0.05 | Teste de Shapiro-Wilk (resíduos) |
+|------------|------------|------------|----------------|--------------------|
+| CS1    | 1,31 %  | 7,35 %       | 1                           | Rejeita H0                       |
+| CS2    | 37,76 % | -38,85 %     | 0                           | Rejeita H0                       |
+| CS3    | 20,77 % | 7,65 %       | 0                           | Rejeita H0                       |
+| CS4    | 6,75 %  | 4,20 %       | 3                           | Rejeita H0                       |
+| CS5    | 1,43 %  | 7,52 %       | 1                           | Rejeita H0                       |
+
+Com isso, pode-se constatar que o ajuste ficou fraco em praticamente todos os modelos. O $R^2_{adjs}$ negativo para o M2 é um indicativo de má especificação do modelo, ou uso das variáveis. E em nenhum dos modelos, os resíduos atenderam os pressupostos de normalidade.
+
+# POOLED OLS
+
+Também foram realizados vários ajustes para regressões *pooled OLS*. O primeiro modelo (POLS1) faz uso dos erros-padrão robustos de White, o segundo modelo (POLS2) é o POLS1 com as dummies de setor do economática mais dummies de trimestre, e o terceiro (POLS3) e o quarto modelo (POLS4) é o POLS1 e POLS2, respectivamente, agrupado por setores do economática. O modelo é similar ao utilizado para os dados *cross section*, com excessão ao POLS2 e POLS3 que não tem o $\phi(SE)$ e possuem dummies para o trimestre. A Tabela 3 mostra os resultados obtidos com os modelos supracitados.
+
+| Ajuste | $R^2$   | $R^2_{adjs}$ | $\beta$'s com p-valor\<0.05 | Teste de Shapiro-Wilk (resíduos) |
+|------------|------------|------------|----------------|--------------------|
+| POLS1  | 0,21 %  | 0,00 %       | 1                           | Rejeita H0                       |
+| POLS2  | 13,55 % | 7,42 %       | 1                           | Rejeita H0                       |
+| POLS3  | 8,32 %  | 7,32 %       | 4                           | Rejeita H0                       |
+| POLS4  | 10,36 % | 7,35 %       | 1                           | Rejeita H0                       |
+
+Por fim, conclui-se que nenhum modelo providenciou um ajuste satisfatório para o conjunto de dados. Nenhum apresentou normalidade nos resíudos, ou algum ajuste satisfatório.
+
+# MODELO ALTERNATIVO
+
+Sabe-se que uma alavancagem negativa indica um patrimônio líquido a descoberto. Caso considerássemos apenas valores positivos para a alavancagem, a transformação BoxCox seria uma ferramenta interessante pois permitira identificar a melhor transformação para a nossa variável resposta (no caso, a alavancagem). Pensando nisso, removeu-se as observações cuja as alavancagens apresentaram valores negativos. E então, por meio do método de BoxCox, concluiu-se que a melhor transformação era a transformação logarítimica da variável. A Tabela 4 mostra quais foram os resultados para as regressões com as alavancagens positivas e logaritmizadas.
+
+| Ajuste | $R^2$   | $R^2_{adjs}$ | $\beta$'s com p-valor\<0.05 | Teste de Shapiro-Wilk (resíduos) |
+|------------|------------|------------|----------------|--------------------|
+| CS1    | 20,81 % | 20,83 %      | 16                          | Rejeita H0                       |
+| CS2    | 70,61 % | 34,43 %      | 1                           | Não rejeita H0                   |
+| CS3    | 31,06 % | 12,53 %      | 4                           | Rejeita H0                       |
+| CS4    | 41,71 % | 39,95 %      | 12                          | Rejeita H0                       |
+| CS5    | 22,42 % | 21,88 %      | 14                          | Rejeita H0                       |
+| POLS1  | 25,29 % | 25,14 %      | 10                          | Rejeita H0                       |
+| POLS2  | 31,67 % | 31,22 %      | 19                          | Rejeita H0                       |
+| POLS3  | 35,52 % | 34,80 %      | 8                           | Rejeita H0                       |
+| POLS4  | 52,21 % | 50,58 %      | 11                          | Rejeita H0                       |
+
+De forma geral, foi observada melhoras em todos os ajustes. Essa é uma boa evidência que ilustra a importância de segregar as observações para a condução da análise. Talvez, a melhora do ajuste se explique pelo fato de termos removido empresas que apresentaram valores de alavancagem extremamente absurdos. Logo no primeiro gráfico exposto na Figura 1, na Análise Exploratória, foi possível observar que uma ou algumas empresas apresentavam valores de alavancagem abusdamente distoantes em comparação com as outras empresas.
+
+# CONSIDERAÇÕES FINAIS
+
+Para investigar a relação entre a alavancagem das empresas *versus* níveis de governança e outros indicadores financeiros, as técnicas *cross section* ou *pooled OLS* não parecem ser adequadas e melhorar suas performances com a alternativa proposta, necessáriamente inputa um viés de seleção nos modelos. As empresas (i.e.: indivíduos/unidades experimentais) são muito diferentes entre si e por isso, o uso de métodos para dados longitudinais/painel é necessário. Pois o efeito aleatório de cada empresa "atrapalha" de forma significativa os ajustes.
+
+# APÊNDICE
+
+```{r}
+
+# Puxando os dados 
+
+library(readxl)
+Base_2023 <- read_excel("Base_2023.xlsx")
+Base_2023$anotrim <- Base_2023$year*10+Base_2023$quarter
+Base_2023$data <- as.Date(paste(Base_2023$year, Base_2023$quarter*3-2, "01", sep = "-"))
+
+library(dplyr)
+
+Base_2023=Base_2023|>transmute(
+  "nome_companhia"=name_short,
+  "data"=data,
+  "setoreconomatica"=setoreconomtica,
+  "alavancagem"=longtermdebt/patrimniolquido,
+  "tamanhoEmpresa"=	totalasset,
+  "nivel_de_gov"=corporategovernancelevel,
+  "imobilizado"	=permanentasset/totalasset,
+  "retornoSobreAtivo"=	ebit/totalasset,
+  "qDeTobin"=	(shorttermdebt+longtermdebt+shares_outstanding)/totalasset,
+  "ROA"=netprofit/totalasset,
+  "ano"=year,
+  "trim"=quarter
+)|>na.omit()
+Base_2023 <- Base_2023[Base_2023$nome_companhia!="0", ]
+
+row.names(Base_2023)<-NULL
+
+# Dados em Painel
+
+crossection1 <- lm(alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa) +
+                               imobilizado + retornoSobreAtivo + qDeTobin,#+ ROA,
+                   data=Base_2023)
+crossection1|>summary()
+
+shapiro.test(crossection1$residuals)
+
+
+crossection2 <- lm(alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa)  +
+                               imobilizado + retornoSobreAtivo + qDeTobin ,#+ ROA,
+                   data=Base_2023[Base_2023$data==min(Base_2023$data),])#|>step(trace=FALSE)
+crossection2|>summary()
+
+shapiro.test(crossection2$residuals)
+
+crossection3 <- lm(alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa)  +
+                               imobilizado + retornoSobreAtivo + qDeTobin ,#+ ROA,
+                   data=Base_2023[Base_2023$data==max(Base_2023$data),])
+crossection3|>summary()
+
+shapiro.test(crossection3$residuals)
+
+
+crossection4 <- lm(alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa)  +
+                               imobilizado + retornoSobreAtivo + qDeTobin ,#+ ROA,
+                   data=Base_2023[Base_2023$data<={Base_2023$data|>unique()|>sort()}[bp$breakpoints],])
+crossection4|>summary()
+shapiro.test(crossection4$residuals)
+
+
+crossection5 <- lm(alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa)  +
+                               imobilizado + retornoSobreAtivo + qDeTobin ,#+ ROA,
+                   data=Base_2023[Base_2023$data>{Base_2023$data|>unique()|>sort()}[bp$breakpoints],])
+crossection5|>summary()
+shapiro.test(crossection5$residuals)
+
+
+# Pooled OLS
+
+# Carregando os pacotes necessários
+library(sandwich)
+library(lmtest)
+library(plm)
+            
+POLS1 <- plm(alavancagem ~ nivel_de_gov + log(tamanhoEmpresa) + 
+                            imobilizado + retornoSobreAtivo + qDeTobin + ROA, 
+                          data = Base_2023, model = "pooling", vcov = "HC1")
+summary(POLS1)
+shapiro.test(POLS1$residuals)
+
+POLS2 <- plm(alavancagem ~ nivel_de_gov + log(tamanhoEmpresa) + 
+                            imobilizado + retornoSobreAtivo + qDeTobin + ROA + setoreconomatica + factor(trim), 
+                          data = Base_2023, model = "pooling", vcov = "HC1")
+summary(POLS2)
+shapiro.test(POLS2$residuals)
+
+## Agrupando por setor
+pdata <- group_by(Base_2023,setoreconomatica,data)|>summarise(
+    "data"=first(data),
+    "alavancagem"=	mean(alavancagem),
+    "tamanhoEmpresa"=	mean(tamanhoEmpresa),
+    "nivel_de_gov"=first(nivel_de_gov),
+    "imobilizado"	=mean(imobilizado),
+    "retornoSobreAtivo"=	mean(retornoSobreAtivo),
+    "qDeTobin"=	mean(qDeTobin),
+    "ROA"=mean(ROA),
+    "ano"=first(ano),
+    "trim"=first(trim)
+)
+
+POLS3 <- plm(alavancagem ~ nivel_de_gov + log(tamanhoEmpresa) + 
+                            imobilizado + retornoSobreAtivo + qDeTobin + 
+               ROA + factor(trim), data = pdata, model = "poo)°ling", vcov = "HC1")
+
+summary(POLS3)
+shapiro.test(POLS3$residuals)
+
+POLS4 <- plm(alavancagem ~ nivel_de_gov + log(tamanhoEmpresa) + 
+                            imobilizado + retornoSobreAtivo + qDeTobin + 
+               ROA + setoreconomatica + factor(trim), data = pdata, model = "pooling", vcov = "HC1")
+
+summary(POLS4)
+shapiro.test(POLS4$residuals)
+
+# Alternativo
+
+Base_2023_alt <- Base_2023[Base_2023$alavancagem>0,]
+
+# Realizando a transformação de BoxCox
+MASS::boxcox(lm(alavancagem ~ nivel_de_gov + log(tamanhoEmpresa) +
+                            imobilizado + retornoSobreAtivo + qDeTobin + ROA + setoreconomatica + trim + ano,data=Base_2023_alt)) #log
+
+Base_2023_alt$log_alavancagem <-  log(Base_2023_alt$alavancagem)
+
+## Crosssection
+
+
+crossection1 <- lm(log_alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa) +
+                               imobilizado + retornoSobreAtivo + qDeTobin,#+ ROA,
+                   data=Base_2023_alt)
+crossection1|>summary()
+
+shapiro.test(crossection1$residuals)
+
+
+crossection2 <- lm(log_alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa)  +
+                               imobilizado + retornoSobreAtivo + qDeTobin ,#+ ROA,
+                   data=Base_2023_alt[Base_2023_alt$data==min(Base_2023_alt$data),])#|>step(trace=FALSE)
+crossection2|>summary()
+
+shapiro.test(crossection2$residuals)
+
+crossection3 <- lm(log_alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa)  +
+                               imobilizado + retornoSobreAtivo + qDeTobin ,#+ ROA,
+                   data=Base_2023_alt[Base_2023_alt$data==max(Base_2023_alt$data),])
+crossection3|>summary()
+
+shapiro.test(crossection3$residuals)
+
+
+crossection4 <- lm(log_alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa)  +
+                               imobilizado + retornoSobreAtivo + qDeTobin ,#+ ROA,
+                   data=Base_2023_alt[Base_2023_alt$data<={Base_2023_alt$data|>unique()|>sort()}[bp$breakpoints],])
+crossection4|>summary()
+shapiro.test(crossection4$residuals)
+
+
+crossection5 <- lm(log_alavancagem ~ nivel_de_gov + setoreconomatica + log(tamanhoEmpresa)  +
+                               imobilizado + retornoSobreAtivo + qDeTobin ,#+ ROA,
+                   data=Base_2023_alt[Base_2023_alt$data>{Base_2023_alt$data|>unique()|>sort()}[bp$breakpoints],])
+crossection5|>summary()
+shapiro.test(crossection5$residuals)
+
+
+
+
+# Pooled OLS
+POLS1 <- plm(log_alavancagem ~ nivel_de_gov + log(tamanhoEmpresa) + 
+                            imobilizado + retornoSobreAtivo + qDeTobin + ROA, 
+                          data = Base_2023_alt, model = "pooling", vcov = "HC1")
+
+summary(POLS1)
+shapiro.test(POLS1$residuals)
+
+POLS2 <- plm(log_alavancagem ~ nivel_de_gov + log(tamanhoEmpresa) + 
+                            imobilizado + retornoSobreAtivo + qDeTobin + ROA + setoreconomatica + factor(trim), 
+                          data = Base_2023_alt, model = "pooling", vcov = "HC1")
+summary(POLS2)
+shapiro.test(POLS2$residuals)
+
+## Agrupando por setor
+pdata <- group_by(Base_2023_alt,setoreconomatica,data)|>summarise(
+    "data"=first(data),
+    "log_alavancagem"=	mean(log_alavancagem),
+    "tamanhoEmpresa"=	mean(tamanhoEmpresa),
+    "nivel_de_gov"=first(nivel_de_gov),
+    "imobilizado"	=mean(imobilizado),
+    "retornoSobreAtivo"=	mean(retornoSobreAtivo),
+    "qDeTobin"=	mean(qDeTobin),
+    "ROA"=mean(ROA),
+    "ano"=first(ano),
+    "trim"=first(trim)
+)
+
+POLS3 <- plm(log_alavancagem ~ nivel_de_gov + log(tamanhoEmpresa) + 
+                            imobilizado + retornoSobreAtivo + qDeTobin + 
+               ROA + factor(trim), data = pdata, model = "pooling", vcov = "HC1")
+
+summary(POLS3)
+shapiro.test(POLS3$residuals)
+
+POLS4 <- plm(log_alavancagem ~ nivel_de_gov + log(tamanhoEmpresa) + 
+                            imobilizado + retornoSobreAtivo + qDeTobin + 
+               ROA + setoreconomatica + factor(trim), data = pdata, model = "pooling", vcov = "HC1")
+
+summary(POLS4)
+shapiro.test(POLS4$residuals)
+
+```

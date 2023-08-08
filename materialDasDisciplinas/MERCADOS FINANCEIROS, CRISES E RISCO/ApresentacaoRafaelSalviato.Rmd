@@ -1,0 +1,33 @@
+---
+title: "Sistemas Monetários Internacionais"
+subtitle: "Uma visão histórica"
+author: "Rafael Buttini Salviato"
+date: "2023-08-08"
+output: 
+  ioslides_presentation:
+    css: styles.css
+    width: 95% 
+---
+
+# Apresentação {data-background=primeiro2.gif data-background-size=cover}
+
+## Apresentação
+
+- Tópicos:
+    1. Objetivos da política macroeconômica em uma economia aberta
+    2. Os anos entre guerras, 1918-1939
+    3. O sistema de Bretton-Woods e o Fundo Monetário Internacional
+    4. Analisando as opções de política econômica no sistema de Bretton-Woods
+    5. O problema de equilíbrio externo dos Estados Unidos
+    6. A inflação mundial e a transição para taxas flutuantes  
+
+## Objetivos da política macroeconômica em uma economia aberta
+
+
+
+## Os anos entre guerras, 1918-1939
+
+## O sistema de Bretton-Woods e o Fundo Monetário Internacional
+## Analisando as opções de política econômica no sistema de Bretton-Woods
+## O problema de equilíbrio externo dos Estados Unidos
+## A inflação mundial e a transição para taxas flutuantes 

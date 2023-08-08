@@ -1,0 +1,134 @@
+---
+title: "Demonstração do pacote *Strucchange*"
+author: "Rafael Buttini Salviato"
+format: html
+editor: visual
+embed-resources: true 
+---
+
+## Apresentação
+
+A partir da atividade proposta pelo prof Adalto, vou demonstrar a deteção de quebra estrutural numa série temporal. O banco de dados escolhido foi o BD-usd_ibov_selic_gold, com a série mensal do índice bovespa, taxa selic, USD e Ouro, junto com as suas variações percentuais de jun/95 até mai/20.
+
+## Primeira análise
+
+Aqui, vou deixar a análise de correlação feita para as variáveis do conjunto de dados, que foi feita para o trabalho da disciplina.
+
+```{r}
+setwd("~/Documentos/UFPR/Mestrado - PPGEcon/Disciplinas/ESTATÍSTICA/General/Tarefa de casa")
+# Importando os dados
+df <- read.csv2("BD-usd_ibov_selic_gold.csv")
+df$Data<- as.Date(df$Data,"%d/%m/%y")
+df|>str()
+```
+
+```{r}
+plot(df[,c("IndiceBov", "Selic_taxa_percent", "USD", "Ouro")])
+```
+
+```{r}
+df["exp_Selic_taxa_percent"]=log(df["Selic_taxa_percent"])
+plot(df[,c("IndiceBov", "exp_Selic_taxa_percent", "USD", "Ouro")])
+```
+
+Beleza, vamos montar um correlograma com as variáveis IndiceBov, Selic_taxa_percent, USD e Ouro.
+
+```{r,message=FALSE, warning=FALSE}
+
+#install.packages("GGally")
+
+# Quick display of two cabapilities of GGally, to assess the distribution and correlation of variables 
+library(GGally)
+
+ 
+# Check correlations (as scatterplots), distribution and print corrleation coefficient 
+ggpairs(df[,c("IndiceBov",
+              "exp_Selic_taxa_percent",
+              "Selic_taxa_percent",
+              "USD",
+              "Ouro")],
+        title="Correlograma do BD-usd_ibov_selic_gold com o exponencial da taxa Selic",
+        progress = FALSE) 
+
+```
+
+## Segunda análise
+
+Vamos analisar o índice Ibovespa ao longo do tempo.
+
+```{r}
+
+plot(df$Data,df$IndiceBov, type="l")
+
+```
+
+O pacote [strucchange](https://cran.r-project.org/web//packages/strucchangeRcpp/vignettes/strucchange-intro.pdf) disponibiliza ferramentas para detectarmos quebras estruturais em modelos de regressão. Num contexto de séries temporais, podemos pensar num modelo de regressão linear simples para representar o componente de tendência da série. Com isso, vamos utilizar a função [breakpoint](https://www.rdocumentation.org/packages/strucchange/versions/1.5-3/topics/breakpoints) para nos dizer quantos e quais pontos de quebra temos na série do "IndiceBov":
+
+```{r}
+#install.packages("strucchange")
+library(strucchange)
+#df$Data|>min()
+ts_data <- ts(df$IndiceBov, start=c(1995, 6), frequency=12)
+breakpoints(ts_data~1)
+```
+
+```{r,message=FALSE, warning=FALSE}
+
+bp <- breakpoints(ts_data~1)
+
+datas_das_quebras <- sort(df$Data)[bp$breakpoints]
+plot(df$Data,df$IndiceBov, type="l")
+sapply(datas_das_quebras,
+       function(x){
+         abline(v=x)
+       })
+
+```
+
+Vamos considerar os 5 pontos: fev/99, nov/02, jul/08 e abr/12. E na sequência, vamos criar variáveis indicadoras para estes pontos de quebra. Com isso, podemos utilizar tais variáveis para ajustar um modelo de regressão que descreva o comportamento do IndiceIbov ao longo do tempo:
+
+```{r,message=FALSE, warning=FALSE}
+
+df$quebra_1 <- sapply(df$Data,
+       function(x){
+         ifelse(x<datas_das_quebras[1],
+                0,1)
+       })
+
+df$quebra_2 <- sapply(df$Data,
+       function(x){
+         ifelse(x<datas_das_quebras[2],
+                0,1)
+       })
+
+df$quebra_3 <- sapply(df$Data,
+       function(x){
+         ifelse(x<datas_das_quebras[3],
+                0,1)
+       })
+
+df$quebra_4 <- sapply(df$Data,
+       function(x){
+         ifelse(x<datas_das_quebras[4],
+                0,1)
+       })
+
+m1=lm(IndiceBov~exp_Selic_taxa_percent+
+     USD+
+     Ouro+
+     quebra_1+
+     quebra_2+
+     quebra_3+
+     quebra_4, data=df)
+m1|>summary()
+
+```
+
+```{r,message=FALSE, warning=FALSE}
+par(mfrow=c(2,2))
+m1|>plot()
+```
+
+E pronto! Bom, do modelo ajustado podemos descartar a "quebra_3" pois esta não foi significativa para o modelo (i.e: p-valor de 50%, então o IC de 95% da variável contem o valor zero). Também, é válido a inclusão de variáveis de interação (e.g: "Ouro\*quebra1") para melhorar a predição do modelo.
+
+Outro ponto, faz sentido remover as observações 1, 2 e 3, referentes ao começo do ano de 2020. Sabemos que de fato, este é o começo do período pandêmico, então o comportamento fica um pouco desajustado se temos apenas poucas observações. Fato que, nos gráficos de diagnóstico, são estes pontos que acabam "quebrando" o modelo.

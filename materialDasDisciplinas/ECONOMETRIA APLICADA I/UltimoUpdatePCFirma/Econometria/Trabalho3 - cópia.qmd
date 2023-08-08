@@ -1,0 +1,300 @@
+---
+title: "Trabalho 3 - Econometria Aplicada"
+author: "William Viana Borges e Rafael Buttini Salviato"
+format: docx
+editor: visual
+---
+
+
+```{r, echo=FALSE, warning=FALSE ,message=FALSE}
+library(readxl)
+Base_2023 <- read_excel("Base_2023.xlsx")
+Base_2023$anotrim <- Base_2023$year*10+Base_2023$quarter
+Base_2023$data <- as.Date(paste(Base_2023$year, Base_2023$quarter*3-2, "01", sep = "-"))
+
+library(dplyr)
+
+# Dummies para ano trimeste
+
+Base_2023=Base_2023|>transmute(
+  "nome_companhia"=name_short,
+  "data"=data,
+  "factorData"=factor(data),
+  "ano"=year,
+  "trim"=quarter,
+  "setoreconomatica"=setoreconomtica,
+  "alavancagem"=	longtermdebt/patrimniolquido,
+  "tamanhoEmpresa"=	totalasset,
+  "log_tamanhoEmpresa"=	totalasset,
+  "imobilizado"	=permanentasset/totalasset,
+  "retornoSobreAtivo"=	ebit/totalasset,
+  "qDeTobin"=	(shorttermdebt+longtermdebt+shares_outstanding)/totalasset,
+  "ROA"=netprofit/totalasset,
+  "receita"=ifelse(is.na(netrevenue),0,netrevenue)
+)|>na.omit()|>arrange(nome_companhia,data)
+Base_2023 <- Base_2023[Base_2023$nome_companhia!="0", ]
+
+nome_companhia=Base_2023$nome_companhia|>unique()
+crescimento=vector("list",length = length(nome_companhia))
+for(i in 1:length(nome_companhia)){
+  dataframeDaCompanhia= Base_2023[Base_2023$nome_companhia==nome_companhia[i],]
+  receita=dataframeDaCompanhia$receita
+  resultado=c(0,diff(receita)/receita[-length(receita)])*100
+  resultado[is.infinite(resultado) |is.na(resultado)]=0
+  crescimento[[i]]=resultado
+  
+}
+
+Base_2023$crescimento=unlist(crescimento)
+
+row.names(Base_2023)<-NULL
+
+
+#openxlsx::write.xlsx(Base_2023,"Base_2023_trabalho3.xlsx")
+
+
+```
+
+```{r, echo=FALSE, warning=FALSE ,message=FALSE}
+
+library(dplyr)
+
+empresas_observadas_todas_datas <- Base_2023 %>%
+  group_by(nome_companhia) %>%
+  filter(n_distinct(data) == n_distinct(Base_2023$data)) %>%
+  distinct(nome_companhia)
+
+#print(empresas_observadas_todas_datas$nome_companhia) 
+```
+
+Para realizar a atividade, o conjunto de dados foi adaptado e então as seguintes variáveis foram produzidas:
+
+| Nome da variável  | Fórmula com base nas colunas dos dados                     |
+|------------------|------------------------------------------------------|
+| alavancagem       | longtermdebt/patrimniolquido                               |
+| imobilizado       | permanentasset/totalasset                                  |
+| tamanhoEmpresa    | totalasset                                                 |
+| retornoSobreAtivo | ebit/totalasset                                            |
+| qDeTobin          | (shorttermdebt+longtermdebt+shares_outstanding)/totalasset |
+| ROA               | netprofit/totalasset                                       |
+
+# 1) Verifique as variáveis e apresente estatísticas descritivas 
+
+Resp: ao todo, no conjunto de dados final, temos 19 "setoreconomatica", 57 períodos observados entre o primeiro trimestre de 2000 e o primeiro trimestre de 2014,  e 151 "nome_companhia". No Gráfico 1, pode-se ver que as empresas e setores não apareceram em todos os períodos observados. 
+
+```{r, echo=FALSE, warning=FALSE ,message=FALSE}
+par(mfrow=c(1,2))
+
+barplot(table(Base_2023$nome_companhia,Base_2023$data)|>apply(2,sum),
+     xlab="Ano/Trimestre",main="Qtde de empresas observadas",legend=F,ylab="")
+barplot(tapply(Base_2023$setoreconomatica,Base_2023$data,function(x){length(unique(x))}),
+     xlab="Ano/Trimestre",main="Qtde de setores observados",legend=F,ylab="")
+```
+  No que diz respeito as variáveis numéricas, o Gráfico 2 evidencia a forte presença de valores discrepantes. Os diagramas de caixa representam a distribuição das variáveis numéricas do estudo, padronizadas da seguinte forma: $z=\frac{x-\bar{x}}{s}$.
+
+
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+par(mar=c(3,10,3,1))
+variaveisNumericas <- Base_2023[,-c(1,2,3,4,5,6,9)]
+
+variaveisNumericas|>apply(2,scale)|>boxplot(main="Distribuição das variáveis numéricas padronizadas",
+                                            horizontal = TRUE, 
+                                            las=1)
+
+
+```
+
+  O Gráfico 3 mostra um correlograma, onde mercem destaque três pontos: um, é a alta correlação entre "ROA" e "retornoSobreAtivo" (79,2%), o outro é a alta correlação entre "receita" e "tamanhoEmpresa" (75,1%), e por fim a baixa correlação das variáveis, de um modo geral, com a variável resposta "alavancagem". Por fim, dado que "retornoSobreAtivo" e "tamanhoEmpresa" possuem uma correlação com a variável resposta "alavancagem" maior do que as variáveis "ROA" e "receita" respectivamentes, estas serão utilizadas no modelo por padrão. A preferência pela remoção das variáveis "ROA" e "receita" é uma medida tomada para evitar multicolinearidade. 
+
+
+
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+variaveisNumericas <- Base_2023[,-c(1,2,3,4,5,6,9)]
+
+variaveisNumericas|>GGally::ggpairs(
+                title="Correlograma das variáveis quantitativas",
+                progress = FALSE)
+
+```
+
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+# Pegando empresas que apareceram em todos os períodos, apenas
+empresas_observadas_todas_datas <- Base_2023 %>%
+  group_by(nome_companhia) %>%
+  filter(n_distinct(data) == n_distinct(Base_2023$data)) %>%
+  distinct(nome_companhia)
+
+Base_2023=Base_2023[Base_2023$nome_companhia %in% empresas_observadas_todas_datas$nome_companhia,]
+```
+
+
+# 2) Faça uma regressão Pooled OLS usando erros robustos: 
+## a. Usando apenas as variáveis principais. 
+
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+
+pooled1=lm(alavancagem~log_tamanhoEmpresa+
+                       imobilizado+
+                       retornoSobreAtivo+
+                       qDeTobin+
+                       crescimento,
+           data=Base_2023)
+pooled1|>summary() # depois, sem ROA e sem receita
+par(mfrow=c(2,2))
+pooled1|>plot()
+```
+
+
+## b. Usando apenas as variáveis principais e os dummies de trimestre 
+
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+
+pooled2=lm(alavancagem~log_tamanhoEmpresa+
+                       imobilizado+
+                       retornoSobreAtivo+
+                       qDeTobin+
+                       crescimento+
+                       factorData,
+           data=Base_2023)
+pooled2|>summary() # depois, sem ROA e sem receita
+par(mfrow=c(2,2))
+pooled2|>plot()
+```
+
+## c. Usando apenas as variáveis principais, dummies de trimestre e dummies de firma. 
+
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+
+pooled3=lm(alavancagem~log_tamanhoEmpresa+
+                       imobilizado+
+                       retornoSobreAtivo+
+                       qDeTobin+
+                       crescimento+
+                       factorData+
+                       nome_companhia,
+           data=Base_2023)
+pooled3|>summary() # depois, sem ROA e sem receita
+par(mfrow=c(2,2))
+pooled3|>plot()
+```
+
+
+# 3) Faça uma regressão usando efeitos aleatórios e erros robustos: 
+
+OBS: o "ROA" foi utilizado ao invés do "retornoSobreAtivo", devido a problemas de convergência para a estimativa dos erros robustos. Provávelmente, isso acontece por conta dos valores extremos que o "retornoSobreAtivo" apresenta.
+
+## a. Usando apenas as variáveis principais. 
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+
+library(plm)
+library(lmtest)
+
+pdata <- pdata.frame(Base_2023, index = c("nome_companhia", "data"))|>na.omit()
+
+
+RE1=plm(alavancagem~log_tamanhoEmpresa+
+                       imobilizado+
+                       #retornoSobreAtivo+
+                       ROA+
+                       qDeTobin+
+                       crescimento,
+           data=pdata, model="random", effect = "individual",vcov = "HC0",random.method="swar")
+
+
+# Exibir os resultados
+summary(RE1)
+```
+
+
+
+## b. Usando apenas as variáveis principais e os dummies de trimestre 
+
+OBS: aqui, o "retornoSobreAtivo" foi utilizado no lugar do ROA, mas o "tamanhoEmpresa" teve que ser removido devido a problemas de convergência para a estimativa dos erros robustos.
+
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+
+library(plm)
+library(lmtest)
+
+pdata <- pdata.frame(Base_2023, index = c("nome_companhia", "data"))|>as.data.frame()|>na.omit()
+
+RE2=plm(alavancagem~#log_tamanhoEmpresa+
+                       imobilizado+
+                       retornoSobreAtivo+
+                       #ROA+
+                       qDeTobin+
+                       crescimento+
+                       factorData,
+           data=pdata, model="random", effect = "individual",vcov = "HC0",random.method="swar")
+
+
+# Exibir os resultados
+summary(RE2)
+```
+
+## c. Usando apenas as variáveis principais, dummies de trimestre e dummies de firma. 
+
+OBS: aqui, o "retornoSobreAtivo" foi utilizado no lugar do ROA, mas o "tamanhoEmpresa" teve que ser removido devido a problemas de convergência para a estimativa dos erros robustos.
+
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+
+library(plm)
+library(lmtest)
+
+pdata <- pdata.frame(Base_2023, index = c("nome_companhia", "data"))|>as.data.frame()|>na.omit()
+
+RE3=plm(alavancagem~#tamanhoEmpresa+
+                       imobilizado+
+                       retornoSobreAtivo+
+                       #ROA+
+                       qDeTobin+
+                       crescimento+
+                       factorData+
+                       nome_companhia,
+           data=pdata, model="random", effect = "individual",vcov = "HC0",random.method="amemiya")
+
+
+# Exibir os resultados
+summary(RE3)
+```
+
+
+## d. Usando apenas as variáveis principais, dummies de trimestre, dummies de firma e cluster por firma. 
+
+OBS: aqui, o "retornoSobreAtivo" foi utilizado no lugar do ROA, mas o "tamanhoEmpresa" teve que ser removido devido a problemas de convergência para a estimativa dos erros robustos.
+
+```{r,echo=FALSE, warning=FALSE ,message=FALSE}
+
+library(plm)
+library(lmtest)
+
+pdata <- pdata.frame(Base_2023, index = c("nome_companhia", "data"))|>as.data.frame()|>na.omit()
+
+RE4=plm(alavancagem~#tamanhoEmpresa+
+                       imobilizado+
+                       retornoSobreAtivo+
+                       #ROA+
+                       qDeTobin+
+                       crescimento+
+                       factorData+
+                       nome_companhia,
+           data=pdata, model="random", effect = "individual",random.method="amemiya",vcov = "HC0",cluster ="nome_companhia")
+
+
+# Exibir os resultados
+summary(RE4)
+```
+
+
+# 4) Faça regressões usando efeitos fixos e erros robustos:
+## a. Usando apenas as variáveis principais.
+## b. Usando apenas as variáveis principais e os dummies de trimestre
+## c. Usando apenas as variáveis principais, dummies de trimestre e dummies de firma.
+## d. Usando apenas as variáveis principais, dummies de trimestre, dummies de firma e cluster por firma.
+
+# 5) Execute um teste de Hausman para os modelos RE e FE usando o modelo da letra (a) e conclua qual seria a técnica indicada neste caso 
+
+# 6) Sinta-se à vontade para adicionar qualquer análise extra que desejar. Você pode tentar medidas alternativas de alavancagem; adicionar variáveis de controle adicionais que você acha que estão faltando (pode precisar de mais dados a serem baixados). Faça uma breve descrição de seus resultados, incluindo tabelas fáceis de ler de todos as estimativas e outros testes. 
+
+# 7) Faça breves comentários comparando as regressões. O que você conclui?  
+

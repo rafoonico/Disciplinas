@@ -1,0 +1,244 @@
+---
+title: "Trabalho Individual"
+author: "Rafael Buttini Salviato"
+format: pdf
+editor: visual
+---
+
+# Apresentação
+
+```{r,warning=FALSE,message=FALSE}
+# Fonte: procurar neste site: https://forumseguranca.org.br/
+
+library(openxlsx)
+popSistemaPenitenc <- read.xlsx("dados_mvi_fbsp_2023-06-24 (2).xlsx")
+despSegPublica <- read.xlsx("dados_mvi_fbsp_2023-06-24 (1).xlsx")
+rouboFurtoDeVeiculos <- read.xlsx("dados_patrimonial_fbsp_2023-06-24 (6).xlsx")
+rouboDeVeiculos <- read.xlsx("dados_patrimonial_fbsp_2023-06-24 (5).xlsx")
+furtoDeVeiculos <- read.xlsx("dados_patrimonial_fbsp_2023-06-24 (2).xlsx")
+rouboDeCarga <- read.xlsx("dados_patrimonial_fbsp_2023-06-24 (4).xlsx")
+rouboInstFin <- read.xlsx("dados_patrimonial_fbsp_2023-06-24 (3).xlsx")
+populacao <- ipeadatar::ipeadata("ESTIMA_PO",language = "br");populacao <- populacao[populacao$uname=="Estados",];
+
+populacao$uf <- apply(populacao,1,function(x){
+  if(x[5]==11){return("RO")}else if(x[5]==12){return("AC")}else if(x[5]==13){return("AM")
+    }else if(x[5]==14){return("RR")}else if(x[5]==15){return("PA")}else if(x[5]==16){return("AP")
+    }else if(x[5]==17){return("TO")}else if(x[5]==21){return("MA")}else if(x[5]==22){return("PI")
+    }else if(x[5]==23){return("CE")}else if(x[5]==24){return("RN")}else if(x[5]==25){return("PA")
+    }else if(x[5]==26){return("PE")}else if(x[5]==27){return("AL")}else if(x[5]==28){return("SE")
+    }else if(x[5]==29){return("BA")}else if(x[5]==31){return("MG")}else if(x[5]==32){return("ES")
+    }else if(x[5]==33){return("RJ")}else if(x[5]==35){return("SP")}else if(x[5]==41){return("PR")
+    }else if(x[5]==42){return("SC")}else if(x[5]==43){return("RS")}else if(x[5]==50){return("MS")
+    }else if(x[5]==51){return("MT")}else if(x[5]==52){return("GO")}else if(x[5]==53){return("DF")}else{return("???")}
+    
+})
+
+populacao$ano <- format(populacao$date,"%Y")
+
+names(populacao)[3]="pop"
+
+df=rbind(popSistemaPenitenc[-5],
+      despSegPublica[-5],
+      rouboFurtoDeVeiculos[-5],
+      rouboDeVeiculos[-5],
+      furtoDeVeiculos[-5],
+      rouboDeCarga[-5],
+      rouboInstFin[-5])
+
+library(tidyverse)
+
+pivot_table <- df %>%
+  group_by(uf, ano,tipo_de_crime) %>%
+  summarize(Soma_Quantidade = sum(qtd)) %>%
+  pivot_wider(names_from = tipo_de_crime, values_from = Soma_Quantidade, values_fill = 0)
+pivot_table[is.na(pivot_table)] <- 0
+pivot_table <- pivot_table[pivot_table$ano %in% c(2014:2020),]
+pivot_table <- pivot_table %>%
+  mutate(across(everything(), ~replace_na(., 0)))
+pivot_table$crimes_economicos <- pivot_table$`Roubo a instituição financeira`+
+                                 pivot_table$`Roubo de carga`+
+                                 pivot_table$`Roubo e furto de veículos`
+
+# plot(pivot_table[,c("crimes_economicos", "Despesas empenhadas na Função Segurança Pública","População do sistema penitenciário")])
+names(pivot_table) <- c("uf", "ano", "roubo_inst_fin", "roubo_carga", "roubo_veic", "despesas", "furto_veic", "roubo_furto_veic", "pop_carceraria", "crimes_economicos")     
+
+pivot_table <- merge(pivot_table,populacao)
+pivot_table <- mutate(pivot_table,
+                      taxa_crime_hab=(crimes_economicos/pop),#*100000,
+                      taxa_gastoSegPub_hab=(despesas/pop),#*100000,
+                      prop_pop_encarceirada=(pop_carceraria/pop),#*100000,
+                      )
+plot(pivot_table[,c("taxa_crime_hab", "taxa_gastoSegPub_hab","prop_pop_encarceirada")])
+
+# Transformação BoxCox
+
+bc <- MASS::boxcox(taxa_crime_hab~ taxa_gastoSegPub_hab+
+                           prop_pop_encarceirada+
+                           taxa_gastoSegPub_hab*prop_pop_encarceirada, data=pivot_table[!(pivot_table$uf %in% c("AC","CE")),])
+(lambda <- bc$x[which.max(bc$y)])
+
+pivot_table$taxa_crime_hab_transf=(pivot_table$taxa_crime_hab^lambda-1)/lambda
+
+plot(pivot_table[,c("taxa_crime_hab_transf", "taxa_gastoSegPub_hab","prop_pop_encarceirada")])
+
+formula_dos_modelos <- crimes_economicos~despesas+pop_carceraria+pop
+  # taxa_crime_hab~ taxa_gastoSegPub_hab+
+  #                           prop_pop_encarceirada+
+  #                           taxa_gastoSegPub_hab*prop_pop_encarceirada
+#           crimes_economicos~despesas+pop_carceraria+pop,#+despesas*pop_carceraria,
+
+```
+
+## Pooled OLS
+
+### Básico
+
+```{r}
+# Pooled OLS
+
+pooled1=lm(formula_dos_modelos, data=pivot_table)
+pooled1|>summary() # depois, sem ROA e sem receita
+par(mfrow=c(2,2))
+pooled1|>plot() # os resiudos fogem da normalidade, ponto de influencia, mas o R2 tá bom.
+
+# Verificando multicolinearidade
+car::vif(pooled1)
+
+```
+
+## Variando estruturas de covariâncias
+
+```{r}
+library(plm)
+
+pdata <- pdata.frame(pivot_table, index = c("uf", "ano"))|>na.omit()
+
+# Ajustar o modelo para dados em painel com diferentes estruturas de covariância
+modelo_uniforme <- plm(formula_dos_modelos,data=pdata, model = "pooling", vcov = "iid")
+modelo_AR1 <- plm(formula_dos_modelos,data=pdata, model = "pooling", vcov = "AR1")
+modelo_ARMA11 <- plm(formula_dos_modelos,data=pdata, model = "pooling", vcov = "ARMA11")
+modelo_antedep1 <- plm(formula_dos_modelos,data=pdata, model = "pooling", vcov = "arellano")
+modelo_espacial_markov <- plm(formula_dos_modelos,data=pdata, model = "pooling", vcov = "fixed", effect = "twoways", vcov = "spatial")
+modelo_toeplitz <- plm(formula_dos_modelos,data=pdata, model = "pooling", vcov = "fixed", effect = "twoways", vcov = "toeplitz")
+modelo_ARH <- plm(formula_dos_modelos,data=pdata, model = "pooling", vcov = "fixed", effect = "twoways", vcov = "ARH1")
+
+```
+
+### Uniforme
+
+```{r}
+
+summary(modelo_uniforme)
+
+```
+
+### AR(1)
+
+```{r}
+
+summary(modelo_AR1)
+
+```
+
+### ARMA(1,1)
+
+```{r}
+
+summary(modelo_ARMA11)
+
+```
+
+### Antedependência de ordem 1
+
+```{r}
+
+summary(modelo_antedep1)
+
+```
+
+### Markov ou espacial
+
+```{r}
+
+summary(modelo_espacial_markov)
+
+```
+
+### Toeplitz
+
+```{r}
+
+summary(modelo_toeplitz)
+
+```
+### ARH(1,1)
+
+```{r}
+
+summary(modelo_ARH)
+
+```
+
+## Efeitos aleatorios
+
+
+```{r}
+# Efeitos aleatorios e erros robustos
+
+RE1=plm(formula_dos_modelos, data=pdata, model="random", effect = "individual",vcov = "HC0")
+
+# Exibir os resultados
+summary(RE1)
+```
+
+## Efeitos fixos
+
+
+```{r}
+# Efeitos fixos
+
+FE1=plm(formula_dos_modelos,data=pdata, model="within", effect = "individual",vcov = "HC0")
+
+# Exibir os resultados
+summary(FE1)
+```
+
+## Efeitos fixos - Modelo Poisson
+
+```{r}
+library(pglm)
+
+FEP1 <- pglm(formula_dos_modelos, family = poisson(),data=pdata, model = "within")
+summary(FEP1)
+
+#Pseudo R2:
+1-logLik(FEP1)[1]/{
+  pdata$nulo=1
+  logLik(pglm(crimes_economicos~nulo, 
+              family = poisson(),
+              data=pdata,
+              model = "within"))[1]
+  }
+
+```
+
+## Efeitos aleatórios - Modelo Poisson
+
+```{r}
+library(pglm)
+
+REP1 <- pglm(formula_dos_modelos, family = poisson(),data=pdata, model = "random")
+summary(REP1)
+
+#Pseudo R2:
+1-logLik(REP1)[1]/{
+  pdata$nulo=1
+  logLik(pglm(crimes_economicos~nulo, 
+              family = poisson(),
+              data=pdata,
+              model = "random"))[1]
+  }
+
+```
+
+

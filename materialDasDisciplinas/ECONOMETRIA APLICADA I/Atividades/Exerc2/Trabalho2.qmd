@@ -1,0 +1,31 @@
+---
+title: "Trabalho 2 - Econometria Aplicada 2023"
+subtitle: "Prof.: Adalto Acir Althaus Juniore"
+author: "William Borges e Rafael Buttini"
+format: pdf
+editor: visual
+---
+
+# IMPORTANDO OS DADOS
+
+Abaixo, importamos os dados e 
+
+```{r}
+library(readxl)
+Base_2023 <- read_excel("Base_2023.xlsx")
+Base_2023$anotrim <- Base_2023$year*10+Base_2023$quarter
+
+library(dplyr)
+
+Base_2023=Base_2023|>group_by(anotrim,setoreconomtica)|>summarise(
+  "alavancagem"=	(sum(shorttermdebt, na.rm=TRUE)+sum(longtermdebt, na.rm=TRUE)-sum(cash, na.rm=TRUE))/sum(patrimniolquido, na.rm=TRUE),
+  "tamanhoEmpresa"=	mean(totalasset, na.rm=TRUE),
+  "imobilizado"	=sum(permanentasset, na.rm=TRUE)/sum(totalasset, na.rm=TRUE),
+  "retornoSobreAtivo"=	sum(ebit, na.rm=TRUE)/sum(totalasset, na.rm=TRUE),
+  "qDeTobin"=	((sum(shorttermdebt, na.rm=TRUE)+sum(longtermdebt, na.rm=TRUE))+sum(freefloat, na.rm=TRUE))/sum(totalasset, na.rm=TRUE),
+  "ROA"=	sum(netprofit, na.rm=TRUE)/sum(totalasset, na.rm=TRUE)
+)|>na.omit()
+
+openxlsx::write.xlsx(Base_2023,"Base_2023_corrigida.xlsx")
+
+```

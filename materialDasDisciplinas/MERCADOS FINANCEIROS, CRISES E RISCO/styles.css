@@ -1,0 +1,29 @@
+.title-slide {
+    background-image: url("primeiro.gif");
+    background-size: cover;
+    background-position: center;
+    color: white; /* Define a cor do texto para que seja legível no fundo */
+  }
+/* Sombra transparente sobre o GIF de fundo */
+.title-slide::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background-color: rgba(0, 0, 0, 0.5); /* Cor preta com 40% de opacidade */
+  }
+.title-slide hgroup h1, .title-slide hgroup h2, .title-slide hgroup p {
+    color: #ffffff; /* Branco em código hexadecimal */
+  }
+
+/* Estilo para o slide "Apresentação" */
+.slide-apresentacao {
+    background-image: url("primeiro2.gif");
+    background-size: cover;
+    background-position: center;
+    color: white; /* Define a cor do texto para que seja legível no fundo */
+  }
+  
+

@@ -1,0 +1,47 @@
+---
+title: "Exercício 2 - Estatística"
+author: "Trabalho em grupo (William, Gustavo e Rafael)"
+format: html
+editor: visual
+---
+
+## Apresentação
+
+O comando da atividade é: "Explore e desenvolva alguma conclusão original sobre o banco de dados escolhido". O banco de dados escolhido foi o BD-usd_ibov_selic_gold, com a série mensal do índice bovespa, taxa selic, USD e Ouro, junto com as suas variações percentuais de jun/95 até mai/20.
+
+```{r}
+setwd("~/Documentos/UFPR/Mestrado - PPGEcon/Disciplinas/ESTATÍSTICA/General/Tarefa de casa")
+# Importando os dados
+df <- read.csv2("BD-usd_ibov_selic_gold.csv")
+df|>str()
+```
+
+```{r}
+plot(df[,c("IndiceBov", "Selic_taxa_percent", "USD", "Ouro")])
+```
+
+```{r}
+df["exp_Selic_taxa_percent"]=log(df["Selic_taxa_percent"])
+plot(df[,c("IndiceBov", "exp_Selic_taxa_percent", "USD", "Ouro")])
+```
+
+Beleza, vamos montar um correlograma com as variáveis IndiceBov, Selic_taxa_percent, USD e Ouro.
+
+```{r}
+
+#install.packages("GGally")
+
+# Quick display of two cabapilities of GGally, to assess the distribution and correlation of variables 
+library(GGally)
+
+ 
+# Check correlations (as scatterplots), distribution and print corrleation coefficient 
+ggpairs(df[,c("IndiceBov",
+              "exp_Selic_taxa_percent",
+              "Selic_taxa_percent",
+              "USD",
+              "Ouro")],
+        title="Correlograma do BD-usd_ibov_selic_gold com o exponencial da taxa Selic",
+        progress = FALSE) 
+
+```
