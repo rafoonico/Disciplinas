@@ -1,4 +1,3 @@
 *.zip
-*.xlsx
-*.xls
-*.pdf
+*.RData
+*.Rhistory
