@@ -18,12 +18,80 @@
     color: #ffffff; /* Branco em código hexadecimal */
   }
 
-/* Estilo para o slide "Apresentação" */
-.slide-apresentacao {
-    background-image: url("primeiro2.gif");
-    background-size: cover;
-    background-position: center;
-    color: white; /* Define a cor do texto para que seja legível no fundo */
-  }
-  
+[data-slide-num="2"]::before {
+  background-image: url("primeiro.gif");
+  background-size: cover;
+  background-position: center;
+  color: #ffffff; /* Branco em código hexadecimal */
+}
 
+[data-slide-num="2"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.4); /* Cor preta com 40% de opacidade */
+}
+
+[data-slide-num="2"] hgroup h1 {
+  color: #ffffff; /* Branco em código hexadecimal */
+}
+
+.svg {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-color: rgba(0, 0, 0, 0.5); /* Cor preta com 40% de opacidade */
+}
+
+
+[data-slide-num="7"]::before {
+  background-image: url("aucklandNewZealand.gif");
+  background-size: cover;
+  background-position: center;
+  color: black; /* Branco em código hexadecimal */
+}
+
+[data-slide-num="7"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  color: black; /* Branco em código hexadecimal */
+  background-color: rgba(0, 0, 0, 0.5); /* Cor preta com 40% de opacidade */
+}
+
+[data-slide-num="7"] hgroup h2 {
+  background-color: rgba(255, 255, 255, 0.4);
+  color: black; /* Branco em código hexadecimal */
+}
+
+[data-slide-num="9"]::before {
+  background-image: url("timetravel.gif");
+  background-size: cover;
+  background-position: center;
+  color: black; /* Branco em código hexadecimal */
+}
+
+[data-slide-num="9"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  color: black; /* Branco em código hexadecimal */
+  background-color: rgba(0, 0, 0, 0.5); /* Cor preta com 40% de opacidade */
+}
+
+[data-slide-num="9"] hgroup h2 {
+  background-color: rgba(255, 255, 255);
+  color: black; /* Branco em código hexadecimal */
+}
